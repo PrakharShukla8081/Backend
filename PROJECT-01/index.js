@@ -1,9 +1,44 @@
 const express = require("express")
-const users = require("./MOCK_DATA.json")
+
+const mongoose = require('mongoose')
+
 const fs = require("fs")
 
 const app = express()
 const PORT = 8000;
+
+// Connecction 
+
+mongoose.connect('mongodb://127.0.0.1:27017/youtube-app-1')
+.then(()=> console.log('Mongo Db Connected'))
+.catch(err => console.log("Mongo Error",err));
+
+
+//Schema 
+const userSchema = new mongoose.Schema({
+    firstName :{
+        type: String,
+        required : true,
+    },
+    lastName: {
+        type : String
+    },
+    email:{
+        type :String,
+        require: true,
+        unique: true
+    },
+    jobTitle:{
+        type:String 
+    },
+    gender:{
+        type: String
+    },
+},
+    { timestamps: true}
+)
+
+const User =  mongoose.model("user", userSchema );
 
 app.use(express.json());
 
@@ -11,18 +46,21 @@ app.use(express.json());
 
 app.use(express.urlencoded({extended:false}))
 
-app.get('/users', (req,res)=>{
+app.get('/users', async(req,res)=>{
+    const allDBUsers = await User.find({})
     const html = `
     <ul>
-        ${users.map((user)=>`<li>${user.first_name}</li>`).join("")}
+        ${allDBUsers.map((user)=>`<li>${user.firstName}- ${user.email}</li>`).join("")}
     </ul>
     `;
      res.send(html)
 });
 
 // REST API 
-app.get('/api/users', (req, res)=>{
-    return res.json(users)
+app.get('/api/users', async(req, res)=>{
+        const allDBUsers = await User.find({})
+
+    return res.json(allDBUsers)
 })
 
 app.route('/api/users/:id').get((req, res)=>{
@@ -61,18 +99,31 @@ app.route('/api/users/:id').get((req, res)=>{
   })
 
 
-app.post('/api/users', (req,res)=>{
+app.post('/api/users',async(req,res)=>{
     // TODO : Create new User
 
     const  body = req.body
-    if(!body || !body.first_name || !body.last_name || !body.email || !body.gender || !body.job_title){
+    if(
+        !body ||
+        !body.first_name ||
+        !body.last_name ||
+        !body.email || 
+        !body.gender ||
+        !body.job_title
+    ){
         return res.status(400).json({msg: "All fields are required"})
     }
-    users.push({...body, id: users.length+1})
-    fs.writeFile('./MOCK_DATA.json',JSON.stringify(users),(err, data)=>{
+   const result = await User.create({
+    firstName: body.first_name,
+    lastName: body.last_name,
+    email: body.email,
+    gender: body.gender,
+    jobTitle: body.job_title
 
-     return res.json({ status: "sucess",id:users.length});
-    })
+   })
+   console.log(result);
+   
+   return res.status(201).json({msg:"success"})
 });
 
 app.listen(PORT, ()=> console.log(`Server started at PORT:${PORT}`))
